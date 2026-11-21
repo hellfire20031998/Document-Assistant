@@ -38,12 +38,13 @@ spring:
   ai:
     # Chat: every enabled provider gets a chat model; ChatController picks one per request.
     # Embeddings: only ONE provider may embed (the vector store needs a single, consistent model).
-    # Switch with EMBEDDING_PROVIDER=google-genai | openai (openai needs the openai profile).
-    # After switching, empty the vector_store table so documents are re-embedded -
-    # vectors from different models are not comparable.
+    # EMBEDDING_PROVIDER = transformers (default: local ONNX model, no key, no rate limits)
+    #                    | google-genai | openai (openai needs the openai profile)
+    # After switching: set vectorstore.pgvector.dimensions to the model's size (transformers 384,
+    # gemini/openai 768) and DROP the vector_store table so it is recreated and re-embedded.
     model:
-      embedding: ${EMBEDDING_PROVIDER:google-genai}        # read by the OpenAI starter
-      embedding.text: ${EMBEDDING_PROVIDER:google-genai}   # read by the Gemini starter
+      embedding: ${EMBEDDING_PROVIDER:transformers}        # read by the Transformers and OpenAI starters
+      embedding.text: ${EMBEDDING_PROVIDER:transformers}   # read by the Gemini starter
       image: none
       audio.speech: none
       audio.transcription: none
@@ -82,7 +83,7 @@ spring:
         initialize-schema: true
         index-type: HNSW
         distance-type: COSINE_DISTANCE
-        dimensions: 768          # must match the embedding model output
+        dimensions: ${EMBEDDING_DIMENSIONS:384}   # must match the embedding model (transformers 384, gemini/openai 768)
         table-name: vector_store
         max-document-batch-size: 1000
 
@@ -91,11 +92,12 @@ spring:
       max-file-size: 20MB
       max-request-size: 20MB
 
-# Document loading. Small batches with a pause keep free-tier API limits happy.
+# Document loading. The local model has no rate limits, so there's no pause by default.
+# For a cloud embedding provider on a free tier, use a pause of ~60000 to stay under per-minute quotas.
 app:
   ingest:
-    batch-size: 50          # chunks embedded per API request
-    pause-ms: 2000          # wait between batches
+    batch-size: 50          # chunks embedded per batch
+    pause-ms: ${INGEST_PAUSE_MS:0}   # wait between batches
     max-retries: 5          # retries per batch on rate-limit / transient errors
 
 server:

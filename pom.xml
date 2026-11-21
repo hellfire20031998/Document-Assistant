@@ -52,6 +52,11 @@
 			<artifactId>spring-ai-starter-model-google-genai-embedding</artifactId>
 		</dependency>
 		<dependency>
+			<!-- Local embedding model (ONNX, runs inside the JVM): no API key, no rate limits -->
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-transformers</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>org.springframework.ai</groupId>
 			<artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
 		</dependency>
@@ -88,6 +93,13 @@
 	</dependencies>
 	<dependencyManagement>
 		<dependencies>
+			<!-- Pinned: onnxruntime 1.20+ needs MSVC runtime >= 14.40, but the JDK bundles 14.36,
+			     which fails on Windows with "DLL initialization routine failed". 1.19.2 works. -->
+			<dependency>
+				<groupId>com.microsoft.onnxruntime</groupId>
+				<artifactId>onnxruntime</artifactId>
+				<version>1.19.2</version>
+			</dependency>
 			<dependency>
 				<groupId>org.springframework.ai</groupId>
 				<artifactId>spring-ai-bom</artifactId>

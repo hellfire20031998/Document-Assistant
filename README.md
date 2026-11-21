@@ -2,7 +2,8 @@
 
 Ask questions about your PDF documents in a chat UI. Document Assistant is a
 Retrieval-Augmented Generation (RAG) app built with **Spring Boot 4**, **Spring AI 2**,
-**PostgreSQL + pgvector**, and **Google Gemini** (OpenAI optional).
+**PostgreSQL + pgvector**, a **local embedding model** (no key, no rate limits), and
+**Google Gemini** for answers (OpenAI optional).
 
 It ships with the Spring Boot reference documentation preloaded, and you can upload
 your own PDFs from the browser.
@@ -12,14 +13,17 @@ your own PDFs from the browser.
 ```
 Loading a document                          Answering a question
 ──────────────────                          ────────────────────
-PDF ─► read pages (PDFBox, local)           question ─► embed (Gemini/OpenAI)
+PDF ─► read pages (PDFBox, local)           question ─► embed (local model)
     ─► split into ~800-token chunks (local)          ─► find 4 closest chunks (pgvector)
-    ─► embed each chunk (Gemini/OpenAI)              ─► LLM answers using those chunks
+    ─► embed each chunk (local model)                ─► LLM answers using those chunks (Gemini)
     ─► store text + vector in pgvector
 ```
 
-- **Reading and chunking** run locally; only embedding and answering call an AI API.
-- **Embeddings** use a single provider (vectors from different models aren't comparable).
+- **Reading, chunking and embedding** run on your machine; only answering calls an AI API
+  (one request per question).
+- **Embeddings** use `all-MiniLM-L6-v2` via ONNX inside the JVM by default. Gemini or OpenAI
+  embeddings can be switched on instead, but only one provider at a time (vectors from
+  different models aren't comparable).
 - **Chat** can use any enabled provider, chosen per question in the UI.
 - Answers are grounded in your documents; the model is told to say it doesn't know
   when the answer isn't in the retrieved context.
@@ -30,8 +34,9 @@ PDF ─► read pages (PDFBox, local)           question ─► embed (Gemini/Op
 |---|---|
 | Runtime | Java 21, Spring Boot 4.1, Spring MVC |
 | AI | Spring AI 2.0 — `ChatClient`, `QuestionAnswerAdvisor`, PDF document reader |
-| Models | Gemini `gemini-3.5-flash` + `gemini-embedding-001` (default); OpenAI `gpt-4o-mini` + `text-embedding-3-small` (optional) |
-| Vector store | PostgreSQL 16 + pgvector (HNSW index, cosine distance, 768 dimensions) |
+| Chat models | Gemini `gemini-3.5-flash` (default); OpenAI `gpt-4o-mini` (optional) |
+| Embeddings | Local `all-MiniLM-L6-v2` via Spring AI Transformers / ONNX Runtime (default, 384 dims); Gemini `gemini-embedding-001` or OpenAI `text-embedding-3-small` (optional, 768 dims) |
+| Vector store | PostgreSQL 16 + pgvector (HNSW index, cosine distance) |
 | Persistence | Spring Data JPA (read-only view of the vector table) |
 | Dev services | Docker Compose, started automatically by Spring Boot |
 
@@ -69,9 +74,10 @@ PDF ─► read pages (PDFBox, local)           question ─► embed (Gemini/Op
 
 4. **Open** <http://localhost:8080>
 
-On the first start the bundled reference PDF is embedded **in the background**. The UI is
-usable right away; watch the log for `embedded N/M chunks` and
-`Reference PDF loaded - Application is Ready`. On the Gemini free tier this can take a while.
+On the first start the app downloads the local embedding model once (~90 MB, cached
+afterwards) and embeds the bundled reference PDF **in the background** — about a minute for
+its 769 chunks. The UI is usable right away; watch the log for `embedded N/M chunks` and
+`Reference PDF loaded - Application is Ready`.
 
 ## Using it
 
@@ -103,9 +109,10 @@ Main settings live in `src/main/resources/application.yaml`.
 | `GEMINI_API_KEY` (env / `.env`) | — | Gemini key, required by default |
 | `OPENAI_API_KEY` (env / `.env`) | — | OpenAI key, used with the `openai` profile |
 | `SPRING_PROFILES_ACTIVE=openai` | off | Enable OpenAI chat (and optionally embeddings) |
-| `EMBEDDING_PROVIDER` | `google-genai` | Which provider embeds documents: `google-genai` or `openai` |
-| `app.ingest.batch-size` | `50` | Chunks embedded per API request |
-| `app.ingest.pause-ms` | `2000` | Pause between batches |
+| `EMBEDDING_PROVIDER` | `transformers` | Which model embeds documents: `transformers` (local), `google-genai` or `openai` |
+| `EMBEDDING_DIMENSIONS` | `384` | Vector size; must match the model (`384` local, `768` Gemini/OpenAI) |
+| `app.ingest.batch-size` | `50` | Chunks embedded per batch |
+| `INGEST_PAUSE_MS` | `0` | Pause between batches; use ~`60000` for a cloud provider's free tier |
 | `app.ingest.max-retries` | `5` | Retries per batch on rate-limit errors (15 s, 30 s, … backoff) |
 
 ### Enabling OpenAI
@@ -116,19 +123,20 @@ OPENAI_API_KEY=sk-...
 ```
 
 Then run with `SPRING_PROFILES_ACTIVE=openai`. OpenAI appears in the provider dropdown.
-Add `EMBEDDING_PROVIDER=openai` to embed with OpenAI instead of Gemini.
 
 ### Switching the embedding provider
 
-Stored vectors only work with the model that created them. After changing
-`EMBEDDING_PROVIDER`, empty the table so documents are re-embedded on the next start:
+Stored vectors only work with the model that created them. To use Gemini or OpenAI
+embeddings, set `EMBEDDING_PROVIDER` (`google-genai` / `openai`), `EMBEDDING_DIMENSIONS=768`
+and, on a free tier, `INGEST_PAUSE_MS=60000`. Then drop the table so it is recreated at the
+new size and everything is re-embedded on the next start:
 
 ```bash
-docker exec -it <pgvector-container> psql -U myuser -d mydatabase -c "TRUNCATE vector_store;"
+docker exec -it <pgvector-container> psql -U myuser -d mydatabase -c "DROP TABLE vector_store;"
 ```
 
-The same command retries a reference-PDF load that stopped partway (the loader only runs
-when the table is empty).
+To retry a load that stopped partway without changing models, empty the table instead
+(`TRUNCATE vector_store;`) — the loader only runs when the table is empty.
 
 ## Project structure
 
@@ -156,6 +164,7 @@ compose.yaml                       # pgvector database for local development
 |---|---|
 | `Cannot run program "docker"` | Install/start Docker Desktop and make sure `docker` is on your `PATH`; restart your IDE afterwards. |
 | `Could not resolve placeholder 'GEMINI_API_KEY'` | Create `.env` in the project root (the run's working directory) with your key. |
-| `429` / quota errors while loading | Free-tier limits — the loader retries automatically. Increase `app.ingest.pause-ms` or use a smaller PDF. |
+| `onnxruntime.dll: A dynamic link library (DLL) initialization routine failed` (Windows) | ONNX Runtime 1.20+ needs a newer MSVC runtime than the JDK bundles; the pom pins `onnxruntime` 1.19.2 to avoid this. |
+| `429` / quota errors while loading | Only with cloud embeddings on a free tier — the loader retries automatically. Set `INGEST_PAUSE_MS=60000`, or use the default local embeddings. |
 | `429: You have no credits remaining` (OpenAI) | The OpenAI API needs billing credits; use Gemini or add credits. |
 | Answers ignore new documents after switching models | Empty `vector_store` (see above) so everything is re-embedded with one model. |
