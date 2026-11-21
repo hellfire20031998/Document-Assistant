@@ -1,5 +1,6 @@
-package com.hellfire.DocumentAssistant;
+package com.hellfire.DocumentAssistant.config;
 
+import com.hellfire.DocumentAssistant.model.AiProvider;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.model.ChatModel;
@@ -14,11 +15,10 @@ import org.springframework.context.annotation.Configuration;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Builds one ChatClient per enabled provider. All share the same vector store (RAG) and system prompt.
- * A provider whose chat model isn't configured (e.g. Gemini without the "gemini" profile) is skipped.
+ * A provider whose chat model isn't configured (e.g. OpenAI without the "openai" profile) is skipped.
  */
 @Configuration
 public class AiConfig {
@@ -28,17 +28,6 @@ public class AiConfig {
             Use the provided context to answer. If the answer is not in the context,
             say you don't know instead of making something up.
             """;
-
-    /** Holds the ChatClient for each enabled provider. */
-    public record ChatClients(Map<AiProvider, ChatClient> byProvider) {
-        public ChatClient get(AiProvider provider) {
-            return byProvider.get(provider);
-        }
-
-        public Set<AiProvider> available() {
-            return byProvider.keySet();
-        }
-    }
 
     @Bean
     public ChatClients chatClients(ObjectProvider<OpenAiChatModel> openAi,

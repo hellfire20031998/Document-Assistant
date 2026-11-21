@@ -1,4 +1,4 @@
-package com.hellfire.DocumentAssistant;
+package com.hellfire.DocumentAssistant.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

@@ -1,5 +1,9 @@
-package com.hellfire.DocumentAssistant;
+package com.hellfire.DocumentAssistant.controller;
 
+import com.hellfire.DocumentAssistant.config.ChatClients;
+import com.hellfire.DocumentAssistant.dto.ChatRequest;
+import com.hellfire.DocumentAssistant.dto.ChatResponse;
+import com.hellfire.DocumentAssistant.model.AiProvider;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,20 +15,15 @@ import java.util.Set;
 
 /**
  * Answers questions using the documents stored in the vector store (RAG),
- * with any enabled provider (OpenAI and/or Gemini) as the chat model.
+ * with any enabled provider (Gemini and/or OpenAI) as the chat model.
  */
 @RestController
 @RequestMapping("/api/chat")
 public class ChatController {
 
-    /** provider is optional; defaults to the first enabled provider (Gemini). */
-    public record ChatRequest(String question, AiProvider provider) {}
+    private final ChatClients chatClients;
 
-    public record ChatResponse(String answer, AiProvider provider) {}
-
-    private final AiConfig.ChatClients chatClients;
-
-    public ChatController(AiConfig.ChatClients chatClients) {
+    public ChatController(ChatClients chatClients) {
         this.chatClients = chatClients;
     }
 

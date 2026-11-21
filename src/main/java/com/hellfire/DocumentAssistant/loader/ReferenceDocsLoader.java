@@ -1,5 +1,7 @@
-package com.hellfire.DocumentAssistant;
+package com.hellfire.DocumentAssistant.loader;
 
+import com.hellfire.DocumentAssistant.repository.VectorStoreRepository;
+import com.hellfire.DocumentAssistant.service.DocumentIngestionService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;

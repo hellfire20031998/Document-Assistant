@@ -142,14 +142,26 @@ To retry a load that stopped partway without changing models, empty the table in
 
 ```
 src/main/java/com/hellfire/DocumentAssistant/
-├── AiConfig.java                  # One ChatClient per enabled provider, with the RAG advisor
-├── AiProvider.java                # GEMINI / OPENAI (first enabled = default)
-├── ChatController.java            # /api/chat
-├── DocumentController.java        # /api/documents (PDF upload)
-├── DocumentIngestionService.java  # Read → split → embed in batches with retry
-├── ReferenceDocsLoader.java       # Background load of the bundled PDF when the store is empty
-├── VectorStoreEntry.java          # Read-only JPA entity for vector_store
-└── VectorStoreRepository.java
+├── DocumentAssistantApplication.java    # Spring Boot entry point
+├── config/
+│   ├── AiConfig.java                    # One ChatClient per enabled provider, with the RAG advisor
+│   └── ChatClients.java                 # Holder: provider → ChatClient
+├── controller/
+│   ├── ChatController.java              # /api/chat, /api/chat/providers
+│   └── DocumentController.java          # /api/documents (PDF upload)
+├── dto/
+│   ├── ChatRequest.java                 # { question, provider }
+│   └── ChatResponse.java                # { answer, provider }
+├── model/
+│   └── AiProvider.java                  # GEMINI / OPENAI (first enabled = default)
+├── service/
+│   └── DocumentIngestionService.java    # Read → split → embed in batches with retry
+├── loader/
+│   └── ReferenceDocsLoader.java         # Background load of the bundled PDF when the store is empty
+├── entity/
+│   └── VectorStoreEntry.java            # Read-only JPA entity for vector_store
+└── repository/
+    └── VectorStoreRepository.java       # Spring Data JPA repository
 src/main/resources/
 ├── application.yaml               # Main config (Gemini default)
 ├── application-openai.yaml        # "openai" profile

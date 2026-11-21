@@ -1,5 +1,6 @@
-package com.hellfire.DocumentAssistant;
+package com.hellfire.DocumentAssistant.controller;
 
+import com.hellfire.DocumentAssistant.service.DocumentIngestionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
