@@ -1,0 +1,6 @@
+# Active only with SPRING_PROFILES_ACTIVE=openai.
+# Clears the exclusion list from application.yaml so OpenAI's auto-configuration runs.
+# Requires OPENAI_API_KEY (in .env) on an account with billing credits.
+spring:
+  autoconfigure:
+    exclude: []
